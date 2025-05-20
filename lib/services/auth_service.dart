@@ -15,6 +15,20 @@ class AuthService {
   // Get current user
   User? get currentUser => _currentUser;
 
+  // Check if profile is complete
+  bool get isProfileComplete {
+    if (_currentUser == null) return false;
+    return _currentUser!.name.isNotEmpty &&
+        _currentUser!.department != null &&
+        _currentUser!.year != null;
+  }
+
+  // Check if user is admin
+  bool get isAdmin {
+    if (_currentUser == null) return false;
+    return _currentUser!.isAdmin;
+  }
+
   AuthService(this._apiService);
 
   // Initialize auth service and check for stored user credentials
@@ -24,15 +38,15 @@ class AuthService {
 
       // If we have a token, try to get the current user
       if (_apiService.token != null) {
-        // In a real app, you would have an endpoint to get the current user
-        // For now, we'll just set the user as authenticated
-        _authStateController.add(User(
-          id: 'temp-id',
-          email: 'temp@example.com',
-          name: 'Temporary User',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
+        try {
+          final userData = await _apiService.getCurrentUser();
+          _currentUser = User.fromJson(userData['user']);
+          _authStateController.add(_currentUser);
+        } catch (e) {
+          print('Error getting current user: $e');
+          await _apiService.clearToken();
+          _authStateController.add(null);
+        }
       } else {
         _authStateController.add(null);
       }
@@ -141,4 +155,16 @@ final authStateProvider = Provider<bool>((ref) {
     data: (user) => user != null,
     orElse: () => false,
   );
+});
+
+// Provider for profile completion state
+final profileCompleteProvider = Provider<bool>((ref) {
+  final authService = ref.watch(authServiceProvider);
+  return authService.isProfileComplete;
+});
+
+// Provider for admin status
+final isAdminProvider = Provider<bool>((ref) {
+  final authService = ref.watch(authServiceProvider);
+  return authService.isAdmin;
 });
