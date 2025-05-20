@@ -36,20 +36,21 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         _isLoading = true;
         _errorMessage = null;
       });
-      
+
       try {
         final authService = ref.read(authServiceProvider);
         final user = await authService.signUp(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        
+
         if (user != null && mounted) {
           context.go('/profile-setup');
         }
       } catch (e) {
         setState(() {
           _errorMessage = 'Registration failed: ${e.toString()}';
+          print('Detailed error: $e'); // Print detailed error for debugging
         });
       } finally {
         if (mounted) {
@@ -102,7 +103,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Error message if any
                 if (_errorMessage != null)
                   Container(
@@ -118,7 +119,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
-                
+
                 // Signup form
                 Form(
                   key: _formKey,

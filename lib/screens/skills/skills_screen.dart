@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_community_app/models/skill.dart';
 import 'package:flutter_community_app/theme/app_theme.dart';
 import 'package:flutter_community_app/widgets/bottom_nav_bar.dart';
 import 'package:flutter_community_app/widgets/skill_card.dart';
-import 'package:flutter_community_app/services/data_service.dart';
-import 'package:flutter_community_app/services/auth_service.dart';
 import 'package:go_router/go_router.dart';
 
-class SkillsScreen extends ConsumerStatefulWidget {
+class SkillsScreen extends StatefulWidget {
   const SkillsScreen({super.key});
 
   @override
-  ConsumerState<SkillsScreen> createState() => _SkillsScreenState();
+  State<SkillsScreen> createState() => _SkillsScreenState();
 }
 
-class _SkillsScreenState extends ConsumerState<SkillsScreen> {
+class _SkillsScreenState extends State<SkillsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedCategory = 'All';
@@ -31,8 +28,58 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
     'Cybersecurity',
   ];
 
-  List<Skill> _skills = [];
-  bool _isLoading = true;
+  final List<Skill> _skills = [
+    Skill(
+      id: '1',
+      title: 'Machine Learning',
+      category: 'AI & ML',
+      description: 'Learn the fundamentals of machine learning algorithms and applications.',
+      imageUrl: null,
+      level: 'Intermediate',
+      estimatedTime: '3 months',
+      popularity: 95,
+    ),
+    Skill(
+      id: '2',
+      title: 'Web Development',
+      category: 'Web Development',
+      description: 'Master modern web development with HTML, CSS, JavaScript, and popular frameworks.',
+      imageUrl: null,
+      level: 'Beginner to Advanced',
+      estimatedTime: '6 months',
+      popularity: 98,
+    ),
+    Skill(
+      id: '3',
+      title: 'Flutter Development',
+      category: 'Mobile Development',
+      description: 'Build beautiful cross-platform mobile apps with Flutter and Dart.',
+      imageUrl: null,
+      level: 'Intermediate',
+      estimatedTime: '4 months',
+      popularity: 90,
+    ),
+    Skill(
+      id: '4',
+      title: 'Data Science',
+      category: 'Data Science',
+      description: 'Learn data analysis, visualization, and statistical modeling techniques.',
+      imageUrl: null,
+      level: 'Intermediate to Advanced',
+      estimatedTime: '5 months',
+      popularity: 92,
+    ),
+    Skill(
+      id: '5',
+      title: 'Cloud Computing',
+      category: 'Cloud Computing',
+      description: 'Master cloud platforms like AWS, Azure, and Google Cloud.',
+      imageUrl: null,
+      level: 'Intermediate',
+      estimatedTime: '3 months',
+      popularity: 88,
+    ),
+  ];
 
   @override
   void initState() {
@@ -42,28 +89,6 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
         _searchQuery = _searchController.text;
       });
     });
-    _loadSkills();
-  }
-
-  Future<void> _loadSkills() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final dataService = ref.read(dataServiceProvider);
-      final skills = await dataService.fetchSkills();
-
-      setState(() {
-        _skills = skills;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading skills: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
   @override
@@ -78,33 +103,22 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
       final matchesSearch = _searchQuery.isEmpty ||
           skill.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           skill.description.toLowerCase().contains(_searchQuery.toLowerCase());
-
+      
       // Filter by category
       final matchesCategory = _selectedCategory == 'All' || skill.category == _selectedCategory;
-
+      
       return matchesSearch && matchesCategory;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = ref.watch(isAdminProvider);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Skills'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Theme.of(context).textTheme.bodyLarge?.color,
-        actions: [
-          if (isAdmin)
-            IconButton(
-              icon: const Icon(Icons.admin_panel_settings),
-              onPressed: () {
-                context.push('/admin/skills');
-              },
-            ),
-        ],
       ),
       body: Column(
         children: [
@@ -119,11 +133,11 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                            },
+                          )
                         : null,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -148,7 +162,7 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                     itemBuilder: (context, index) {
                       final category = _categories[index];
                       final isSelected = category == _selectedCategory;
-
+                      
                       return GestureDetector(
                         onTap: () {
                           setState(() {
@@ -183,33 +197,28 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
             ),
           ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredSkills.isEmpty
+            child: _filteredSkills.isEmpty
                 ? const Center(
-              child: Text('No skills found'),
-            )
-                : RefreshIndicator(
-              onRefresh: _loadSkills,
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: _filteredSkills.length,
-                itemBuilder: (context, index) {
-                  return SkillCard(
-                    skill: _filteredSkills[index],
-                    onTap: () {
-                      context.go('/skills/${_filteredSkills[index].id}');
+                    child: Text('No skills found'),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.75,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: _filteredSkills.length,
+                    itemBuilder: (context, index) {
+                      return SkillCard(
+                        skill: _filteredSkills[index],
+                        onTap: () {
+                          context.go('/skills/${_filteredSkills[index].id}');
+                        },
+                      );
                     },
-                  );
-                },
-              ),
-            ),
+                  ),
           ),
         ],
       ),

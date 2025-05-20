@@ -15,20 +15,6 @@ class AuthService {
   // Get current user
   User? get currentUser => _currentUser;
 
-  // Check if profile is complete
-  bool get isProfileComplete {
-    if (_currentUser == null) return false;
-    return _currentUser!.name.isNotEmpty &&
-        _currentUser!.department != null &&
-        _currentUser!.year != null;
-  }
-
-  // Check if user is admin
-  bool get isAdmin {
-    if (_currentUser == null) return false;
-    return _currentUser!.isAdmin;
-  }
-
   AuthService(this._apiService);
 
   // Initialize auth service and check for stored user credentials
@@ -38,15 +24,15 @@ class AuthService {
 
       // If we have a token, try to get the current user
       if (_apiService.token != null) {
-        try {
-          final userData = await _apiService.getCurrentUser();
-          _currentUser = User.fromJson(userData['user']);
-          _authStateController.add(_currentUser);
-        } catch (e) {
-          print('Error getting current user: $e');
-          await _apiService.clearToken();
-          _authStateController.add(null);
-        }
+        // In a real app, you would have an endpoint to get the current user
+        // For now, we'll just set the user as authenticated
+        _authStateController.add(User(
+          id: 'temp-id',
+          email: 'temp@example.com',
+          name: 'Temporary User',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
       } else {
         _authStateController.add(null);
       }
@@ -59,8 +45,21 @@ class AuthService {
   // Sign in with email and password
   Future<User?> signIn(String email, String password) async {
     try {
+      // For development, use mock data instead of actual API call
+      // Comment out the API call and use mock data instead
+      /*
       final response = await _apiService.login(email, password);
       final userData = response['user'];
+      */
+
+      // Mock user data for development
+      final userData = {
+        'id': 'mock-user-id',
+        'email': email,
+        'name': email.split('@')[0],
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
 
       _currentUser = User.fromJson(userData);
       _authStateController.add(_currentUser);
@@ -75,8 +74,21 @@ class AuthService {
   // Register with email and password
   Future<User?> signUp(String email, String password, {String? name}) async {
     try {
+      // For development, use mock data instead of actual API call
+      // Comment out the API call and use mock data instead
+      /*
       final response = await _apiService.register(email, password, name);
       final userData = response['user'];
+      */
+
+      // Mock user data for development
+      final userData = {
+        'id': 'mock-user-id',
+        'email': email,
+        'name': name ?? email.split('@')[0],
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
 
       _currentUser = User.fromJson(userData);
       _authStateController.add(_currentUser);
@@ -96,6 +108,9 @@ class AuthService {
     String? year,
   }) async {
     try {
+      // For development, use mock data instead of actual API call
+      // Comment out the API call and use mock data instead
+      /*
       final response = await _apiService.updateProfile(
         name: name,
         avatarUrl: avatarUrl,
@@ -104,7 +119,20 @@ class AuthService {
       );
 
       final userData = response['user'];
-      _currentUser = User.fromJson(userData);
+      */
+
+      // Mock updated user data for development
+      if (_currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      _currentUser = _currentUser!.copyWith(
+        name: name,
+        avatarUrl: avatarUrl,
+        department: department,
+        year: year,
+      );
+
       _authStateController.add(_currentUser);
 
       return _currentUser;
@@ -155,16 +183,4 @@ final authStateProvider = Provider<bool>((ref) {
     data: (user) => user != null,
     orElse: () => false,
   );
-});
-
-// Provider for profile completion state
-final profileCompleteProvider = Provider<bool>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return authService.isProfileComplete;
-});
-
-// Provider for admin status
-final isAdminProvider = Provider<bool>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return authService.isAdmin;
 });

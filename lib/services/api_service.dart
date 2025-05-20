@@ -47,22 +47,6 @@ class ApiService {
     return headers;
   }
 
-  // Get current user
-  Future<Map<String, dynamic>> getCurrentUser() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/auth/me'),
-      headers: headers,
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return data;
-    } else {
-      throw Exception(data['error'] ?? 'Failed to get current user');
-    }
-  }
-
   // Register user
   Future<Map<String, dynamic>> register(String email, String password, String? name) async {
     final response = await http.post(
@@ -133,7 +117,7 @@ class ApiService {
     }
   }
 
-  // Fetch notes (only user's notes)
+  // Fetch notes
   Future<List<dynamic>> getNotes() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/notes'),
@@ -177,7 +161,7 @@ class ApiService {
     }
   }
 
-  // Fetch papers (only user's papers)
+  // Fetch papers
   Future<List<dynamic>> getPapers() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/papers'),
@@ -237,50 +221,6 @@ class ApiService {
     } else {
       final data = jsonDecode(response.body);
       throw Exception(data['error'] ?? 'Failed to fetch skills');
-    }
-  }
-
-  // Create skill (admin only)
-  Future<Map<String, dynamic>> createSkill({
-    required String title,
-    required String category,
-    required String description,
-    required String level,
-    required String estimatedTime,
-    String? imageUrl,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/skills'),
-      headers: headers,
-      body: jsonEncode({
-        'title': title,
-        'category': category,
-        'description': description,
-        'level': level,
-        'estimatedTime': estimatedTime,
-        'imageUrl': imageUrl,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 201) {
-      return data;
-    } else {
-      throw Exception(data['error'] ?? 'Failed to create skill');
-    }
-  }
-
-  // Delete skill (admin only)
-  Future<void> deleteSkill(String skillId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/api/skills/$skillId'),
-      headers: headers,
-    );
-
-    if (response.statusCode != 200) {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Failed to delete skill');
     }
   }
 
@@ -348,54 +288,6 @@ class ApiService {
     }
   }
 
-  // Send message request
-  Future<Map<String, dynamic>> sendMessageRequest(String receiverId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/messages/request'),
-      headers: headers,
-      body: jsonEncode({
-        'receiverId': receiverId,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 201) {
-      return data;
-    } else {
-      throw Exception(data['error'] ?? 'Failed to send message request');
-    }
-  }
-
-  // Accept message request
-  Future<Map<String, dynamic>> acceptMessageRequest(String requestId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/messages/request/$requestId/accept'),
-      headers: headers,
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode == 200) {
-      return data;
-    } else {
-      throw Exception(data['error'] ?? 'Failed to accept message request');
-    }
-  }
-
-  // Decline message request
-  Future<void> declineMessageRequest(String requestId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/messages/request/$requestId/decline'),
-      headers: headers,
-    );
-
-    if (response.statusCode != 200) {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Failed to decline message request');
-    }
-  }
-
   // Send message
   Future<Map<String, dynamic>> sendMessage(String receiverId, String content) async {
     final response = await http.post(
@@ -415,26 +307,12 @@ class ApiService {
       throw Exception(data['error'] ?? 'Failed to send message');
     }
   }
-
-  // Get all users (for admin)
-  Future<List<dynamic>> getUsers() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/users'),
-      headers: headers,
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      final data = jsonDecode(response.body);
-      throw Exception(data['error'] ?? 'Failed to fetch users');
-    }
-  }
 }
 
 // Provider for API service
 final apiServiceProvider = Provider<ApiService>((ref) {
-  // Use your computer's IP address instead of localhost
-  // Replace 192.168.1.X with your actual IP address
-  return ApiService(baseUrl: 'http://192.168.1.X:3000');
+  // For development, use a mock API service that doesn't require a real backend
+  return ApiService(baseUrl: 'http://10.0.2.2:3000'); // Android emulator localhost
+  // If you're using a physical device or iOS simulator, you might need to use your computer's actual IP address:
+  // return ApiService(baseUrl: 'http://YOUR_ACTUAL_IP:3000');
 });

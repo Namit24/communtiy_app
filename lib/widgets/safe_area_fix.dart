@@ -8,7 +8,7 @@ class SafeAreaFix extends StatelessWidget {
   final bool bottom;
   final bool left;
   final bool right;
-
+  
   const SafeAreaFix({
     Key? key,
     required this.child,
@@ -17,7 +17,7 @@ class SafeAreaFix extends StatelessWidget {
     this.left = true,
     this.right = true,
   }) : super(key: key);
-
+  
   @override
   Widget build(BuildContext context) {
     // On web, SafeArea can sometimes cause layout issues with certain browsers
@@ -32,7 +32,7 @@ class SafeAreaFix extends StatelessWidget {
         child: child,
       );
     }
-
+    
     // On mobile, use standard SafeArea
     return SafeArea(
       top: top,
