@@ -1,78 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_community_app/models/chat.dart';
 import 'package:flutter_community_app/theme/app_theme.dart';
 import 'package:flutter_community_app/widgets/bottom_nav_bar.dart';
 import 'package:flutter_community_app/widgets/chat_list_item.dart';
 import 'package:flutter_community_app/widgets/user_avatar.dart';
+import 'package:flutter_community_app/services/data_service.dart';
 import 'package:go_router/go_router.dart';
 
-class MessagesScreen extends StatefulWidget {
+class MessagesScreen extends ConsumerStatefulWidget {
   const MessagesScreen({super.key});
 
   @override
-  State<MessagesScreen> createState() => _MessagesScreenState();
+  ConsumerState<MessagesScreen> createState() => _MessagesScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProviderStateMixin {
+class _MessagesScreenState extends ConsumerState<MessagesScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  final List<Chat> _chats = [
-    Chat(
-      id: '1',
-      userId: 'user1',
-      userName: 'Priya Sharma',
-      userAvatar: null,
-      lastMessage: 'Hey, did you get the notes from yesterday\'s class?',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-      unreadCount: 2,
-      isOnline: true,
-    ),
-    Chat(
-      id: '2',
-      userId: 'user2',
-      userName: 'Rahul Patel',
-      userAvatar: null,
-      lastMessage: 'Thanks for sharing the project details!',
-      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      unreadCount: 0,
-      isOnline: false,
-    ),
-    Chat(
-      id: '3',
-      userId: 'user3',
-      userName: 'Ananya Gupta',
-      userAvatar: null,
-      lastMessage: 'Let\'s meet at the library tomorrow at 3 PM',
-      timestamp: DateTime.now().subtract(const Duration(days: 1)),
-      unreadCount: 0,
-      isOnline: true,
-    ),
-  ];
-
-  final List<Chat> _requests = [
-    Chat(
-      id: '4',
-      userId: 'user4',
-      userName: 'Vikram Singh',
-      userAvatar: null,
-      lastMessage: 'Hi, I\'m interested in joining your study group for ML.',
-      timestamp: DateTime.now().subtract(const Duration(hours: 5)),
-      unreadCount: 1,
-      isOnline: false,
-    ),
-    Chat(
-      id: '5',
-      userId: 'user5',
-      userName: 'Neha Patel',
-      userAvatar: null,
-      lastMessage: 'Hello, I saw your post about the web dev workshop.',
-      timestamp: DateTime.now().subtract(const Duration(days: 2)),
-      unreadCount: 1,
-      isOnline: true,
-    ),
-  ];
+  List<Chat> _chats = [];
+  List<Chat> _requests = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -83,6 +33,30 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
         _searchQuery = _searchController.text;
       });
     });
+    _loadChats();
+  }
+
+  Future<void> _loadChats() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final dataService = ref.read(dataServiceProvider);
+      final conversations = await dataService.getConversations();
+
+      setState(() {
+        // Filter accepted chats and pending requests
+        _chats = conversations.where((chat) => chat.isAccepted).toList();
+        _requests = conversations.where((chat) => !chat.isAccepted).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading chats: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -140,11 +114,11 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
-                      )
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                )
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -162,81 +136,101 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
             ),
           ),
           Expanded(
-            child: TabBarView(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
               controller: _tabController,
               children: [
                 // Chats Tab
                 _filteredChats.isEmpty
                     ? const Center(
-                        child: Text('No chats found'),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredChats.length,
-                        separatorBuilder: (context, index) => const Divider(),
-                        itemBuilder: (context, index) {
-                          return ChatListItem(
-                            chat: _filteredChats[index],
-                            onTap: () {
-                              context.go('/chat/${_filteredChats[index].userId}');
-                            },
-                          );
+                  child: Text('No chats found'),
+                )
+                    : RefreshIndicator(
+                  onRefresh: _loadChats,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredChats.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      return ChatListItem(
+                        chat: _filteredChats[index],
+                        onTap: () {
+                          context.go('/chat/${_filteredChats[index].userId}');
                         },
-                      ),
-                
+                      );
+                    },
+                  ),
+                ),
+
                 // Requests Tab
                 _filteredRequests.isEmpty
                     ? const Center(
-                        child: Text('No requests found'),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredRequests.length,
-                        separatorBuilder: (context, index) => const Divider(),
-                        itemBuilder: (context, index) {
-                          return Column(
+                  child: Text('No requests found'),
+                )
+                    : RefreshIndicator(
+                  onRefresh: _loadChats,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredRequests.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      return Column(
+                        children: [
+                          ChatListItem(
+                            chat: _filteredRequests[index],
+                            onTap: () {
+                              // View request details
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              ChatListItem(
-                                chat: _filteredRequests[index],
-                                onTap: () {
-                                  // View request
+                              OutlinedButton(
+                                onPressed: () async {
+                                  // Decline request
+                                  try {
+                                    final dataService = ref.read(dataServiceProvider);
+                                    await dataService.declineMessageRequest(_filteredRequests[index].id);
+                                    _loadChats();
+                                  } catch (e) {
+                                    print('Error declining request: $e');
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error declining request: $e')),
+                                    );
+                                  }
                                 },
+                                child: const Text('Decline'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  side: const BorderSide(color: Colors.red),
+                                ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  OutlinedButton(
-                                    onPressed: () {
-                                      // Decline request
-                                      setState(() {
-                                        _requests.removeAt(index);
-                                      });
-                                    },
-                                    child: const Text('Decline'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                      side: const BorderSide(color: Colors.red),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      // Accept request
-                                      final request = _requests[index];
-                                      setState(() {
-                                        _requests.removeAt(index);
-                                        _chats.add(request);
-                                      });
-                                    },
-                                    child: const Text('Accept'),
-                                  ),
-                                ],
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  // Accept request
+                                  try {
+                                    final dataService = ref.read(dataServiceProvider);
+                                    await dataService.acceptMessageRequest(_filteredRequests[index].id);
+                                    _loadChats();
+                                  } catch (e) {
+                                    print('Error accepting request: $e');
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error accepting request: $e')),
+                                    );
+                                  }
+                                },
+                                child: const Text('Accept'),
                               ),
                             ],
-                          );
-                        },
-                      ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -255,6 +249,24 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
   }
 
   void _showNewChatDialog(BuildContext context) {
+    final searchController = TextEditingController();
+    String searchQuery = '';
+    List<dynamic> users = [];
+    bool isLoading = true;
+
+    // Load users
+    Future<void> loadUsers() async {
+      try {
+        final dataService = ref.read(dataServiceProvider);
+        final fetchedUsers = await dataService.getUsers();
+        users = fetchedUsers;
+        isLoading = false;
+      } catch (e) {
+        print('Error loading users: $e');
+        isLoading = false;
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -262,79 +274,121 @@ class _MessagesScreenState extends State<MessagesScreen> with SingleTickerProvid
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.5,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'New Message',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Load users when dialog opens
+            if (isLoading) {
+              loadUsers().then((_) {
+                setState(() {});
+              });
+            }
+
+            // Filter users based on search query
+            final filteredUsers = searchQuery.isEmpty
+                ? users
+                : users.where((user) {
+              return user['name'].toLowerCase().contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'New Message',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search users...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: ListView.separated(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: 10, // Mock user list
-                    separatorBuilder: (context, index) => const Divider(),
-                    itemBuilder: (context, index) {
-                      return ListTile(
-                        leading: const UserAvatar(
-                          radius: 20,
-                          avatarUrl: null,
-                        ),
-                        title: Text('User ${index + 1}'),
-                        subtitle: Text(
-                          index % 2 == 0 ? 'Online' : 'Offline',
-                          style: TextStyle(
-                            color: index % 2 == 0 ? Colors.green : AppTheme.subtitleColor,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: TextField(
+                        controller: searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search users...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        trailing: ElevatedButton(
-                          onPressed: () {
-                            // Send message request
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Message'),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                        onChanged: (value) {
+                          setState(() {
+                            searchQuery = value;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : filteredUsers.isEmpty
+                          ? const Center(child: Text('No users found'))
+                          : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredUsers.length,
+                        separatorBuilder: (context, index) => const Divider(),
+                        itemBuilder: (context, index) {
+                          final user = filteredUsers[index];
+                          return ListTile(
+                            leading: UserAvatar(
+                              radius: 20,
+                              avatarUrl: user['avatarUrl'],
+                            ),
+                            title: Text(user['name']),
+                            subtitle: Text(
+                              user['department'] ?? 'No department',
+                              style: TextStyle(
+                                color: AppTheme.subtitleColor,
+                              ),
+                            ),
+                            trailing: ElevatedButton(
+                              onPressed: () async {
+                                // Send message request
+                                try {
+                                  final dataService = ref.read(dataServiceProvider);
+                                  await dataService.sendMessageRequest(user['id']);
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Message request sent')),
+                                  );
+                                  _loadChats();
+                                } catch (e) {
+                                  print('Error sending message request: $e');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error sending message request: $e')),
+                                  );
+                                }
+                              },
+                              child: const Text('Message'),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );

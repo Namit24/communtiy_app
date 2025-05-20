@@ -18,6 +18,7 @@ model User {
   avatarUrl     String?
   department    String?
   year          String?
+  isAdmin       Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -28,6 +29,8 @@ model User {
   sentMessages     Message[]  @relation("SentMessages")
   receivedMessages Message[]  @relation("ReceivedMessages")
   comments      Comment[]    @relation("CommentAuthor")
+  sentRequests     MessageRequest[] @relation("SentRequests")
+  receivedRequests MessageRequest[] @relation("ReceivedRequests")
 }
 
 model Note {
@@ -38,6 +41,7 @@ model Note {
   fileSize      String
   fileType      String
   downloadCount Int       @default(0)
+  isPublic      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -56,6 +60,7 @@ model Paper {
   fileSize      String
   fileType      String
   downloadCount Int       @default(0)
+  isPublic      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -114,5 +119,18 @@ model Message {
   sender        User      @relation("SentMessages", fields: [senderId], references: [id])
   senderId      String
   receiver      User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId    String
+}
+
+model MessageRequest {
+  id            String    @id @default(uuid())
+  status        String    @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  sender        User      @relation("SentRequests", fields: [senderId], references: [id])
+  senderId      String
+  receiver      User      @relation("ReceivedRequests", fields: [receiverId], references: [id])
   receiverId    String
 }
