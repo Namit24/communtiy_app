@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           Text(
-                            'SY - Artificial Intelligence & Data Science',
+                            'SY - Instrumentation',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppTheme.subtitleColor,
                             ),

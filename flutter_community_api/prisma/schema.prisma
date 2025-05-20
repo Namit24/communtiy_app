@@ -1,0 +1,118 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String?
+  avatarUrl     String?
+  department    String?
+  year          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  notes         Note[]
+  papers        Paper[]
+  forumPosts    ForumPost[]
+  sentMessages     Message[]  @relation("SentMessages")
+  receivedMessages Message[]  @relation("ReceivedMessages")
+  comments      Comment[]    @relation("CommentAuthor")
+}
+
+model Note {
+  id            String    @id @default(uuid())
+  title         String
+  subject       String
+  fileUrl       String
+  fileSize      String
+  fileType      String
+  downloadCount Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  uploadedBy    User      @relation(fields: [userId], references: [id])
+  userId        String
+}
+
+model Paper {
+  id            String    @id @default(uuid())
+  title         String
+  subject       String
+  year          String
+  examType      String
+  fileUrl       String
+  fileSize      String
+  fileType      String
+  downloadCount Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  uploadedBy    User      @relation(fields: [userId], references: [id])
+  userId        String
+}
+
+model Skill {
+  id            String    @id @default(uuid())
+  title         String
+  category      String
+  description   String
+  imageUrl      String?
+  level         String
+  estimatedTime String
+  popularity    Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ForumPost {
+  id            String    @id @default(uuid())
+  content       String
+  likes         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  author        User      @relation(fields: [userId], references: [id])
+  userId        String
+  comments      Comment[]
+}
+
+model Comment {
+  id            String    @id @default(uuid())
+  content       String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  author        User      @relation("CommentAuthor", fields: [userId], references: [id])
+  userId        String
+  post          ForumPost @relation(fields: [postId], references: [id])
+  postId        String
+}
+
+model Message {
+  id            String    @id @default(uuid())
+  content       String
+  isRead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  sender        User      @relation("SentMessages", fields: [senderId], references: [id])
+  senderId      String
+  receiver      User      @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  receiverId    String
+}

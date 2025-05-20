@@ -17,11 +17,7 @@ dependencies:
   flutter_svg: ^2.0.7
   shared_preferences: ^2.2.0
   intl: ^0.18.1
-  # Remove file_picker as it's causing issues with web
-  # file_picker: ^5.3.2
-  # Remove flutter_chat_ui as it might have web compatibility issues
-  # flutter_chat_ui: ^1.6.9
-  # Use just image_picker without web-specific package
+  http: ^1.1.0
   image_picker: ^1.0.4
 
 dev_dependencies:
