@@ -8,13 +8,13 @@ import 'package:flutter_community_app/providers/app_state_provider.dart';
 void main() {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Set preferred orientations
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   // Run the app inside ProviderScope for state management
   runApp(
     const ProviderScope(
@@ -30,10 +30,10 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Get router from provider
     final router = ref.watch(routerProvider);
-    
+
     // Get dark mode state
     final isDarkMode = ref.watch(darkModeProvider);
-    
+
     return MaterialApp.router(
       title: 'Campus Connect',
       theme: AppTheme.lightTheme,

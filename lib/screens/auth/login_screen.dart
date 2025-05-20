@@ -33,14 +33,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _isLoading = true;
         _errorMessage = null;
       });
-      
+
       try {
         final authService = ref.read(authServiceProvider);
         final user = await authService.signIn(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        
+
         if (user != null && mounted) {
           // Login successful, navigation will be handled by router redirect
         }
@@ -92,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Error message if any
                 if (_errorMessage != null)
                   Container(
@@ -108,7 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
-                
+
                 // Login form
                 Form(
                   key: _formKey,

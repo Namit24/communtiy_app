@@ -51,7 +51,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         _isLoading = true;
         _errorMessage = null;
       });
-      
+
       try {
         final authService = ref.read(authServiceProvider);
         final user = await authService.updateProfile(
@@ -60,7 +60,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           department: _selectedBranch,
           year: _selectedYear,
         );
-        
+
         if (user != null && mounted) {
           context.go('/home');
         }
@@ -134,7 +134,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Error message if any
                 if (_errorMessage != null)
                   Container(
@@ -150,7 +150,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
-                
+
                 // Profile form
                 TextFormField(
                   controller: _nameController,
@@ -166,7 +166,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Branch dropdown
                 DropdownButtonFormField<String>(
                   value: _selectedBranch,
@@ -187,7 +187,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Year dropdown
                 DropdownButtonFormField<String>(
                   value: _selectedYear,
@@ -208,7 +208,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   },
                 ),
                 const SizedBox(height: 32),
-                
+
                 CustomButton(
                   text: 'Complete Profile',
                   isLoading: _isLoading,
