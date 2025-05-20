@@ -1,0 +1,35 @@
+name: flutter_community_app
+description: A community app for students to connect, share notes, and discuss skills.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  google_fonts: ^5.1.0
+  flutter_riverpod: ^2.3.6
+  go_router: ^10.0.0
+  cached_network_image: ^3.2.3
+  flutter_svg: ^2.0.7
+  shared_preferences: ^2.2.0
+  intl: ^0.18.1
+  # Remove file_picker as it's causing issues with web
+  # file_picker: ^5.3.2
+  # Remove flutter_chat_ui as it might have web compatibility issues
+  # flutter_chat_ui: ^1.6.9
+  # Use just image_picker without web-specific package
+  image_picker: ^1.0.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
