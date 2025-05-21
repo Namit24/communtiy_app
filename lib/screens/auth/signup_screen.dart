@@ -23,6 +23,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
+  bool _signupSuccessful = false;
 
   @override
   void dispose() {
@@ -38,6 +39,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       setState(() {
         _isLoading = true;
         _errorMessage = null;
+        _signupSuccessful = false;
       });
 
       try {
@@ -49,7 +51,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         );
 
         if (result.success && mounted) {
-          context.go('/profile-setup');
+          setState(() {
+            _signupSuccessful = true;
+          });
+
+          // Wait 3 seconds before navigating to profile setup
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              context.go('/profile-setup');
+            }
+          });
         } else {
           setState(() {
             _errorMessage = result.errorMessage ?? 'Registration failed';
@@ -112,8 +123,44 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 32),
 
+                // Success message
+                if (_signupSuccessful)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Registration successful!',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Please check your email to verify your account. You will be redirected to complete your profile.',
+                          style: TextStyle(color: Colors.green.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Error message if any
-                if (_errorMessage != null)
+                if (_errorMessage != null && !_signupSuccessful)
                   Container(
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 16),
@@ -146,6 +193,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           }
                           return null;
                         },
+                        enabled: !_signupSuccessful,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -164,6 +212,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           }
                           return null;
                         },
+                        enabled: !_signupSuccessful,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -175,7 +224,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                             icon: Icon(
                               _obscurePassword ? Icons.visibility_off : Icons.visibility,
                             ),
-                            onPressed: () {
+                            onPressed: _signupSuccessful
+                                ? null
+                                : () {
                               setState(() {
                                 _obscurePassword = !_obscurePassword;
                               });
@@ -192,6 +243,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           }
                           return null;
                         },
+                        enabled: !_signupSuccessful,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -203,7 +255,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                             icon: Icon(
                               _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                             ),
-                            onPressed: () {
+                            onPressed: _signupSuccessful
+                                ? null
+                                : () {
                               setState(() {
                                 _obscureConfirmPassword = !_obscureConfirmPassword;
                               });
@@ -220,29 +274,32 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           }
                           return null;
                         },
+                        enabled: !_signupSuccessful,
                       ),
                       const SizedBox(height: 24),
-                      CustomButton(
-                        text: 'Sign Up',
-                        isLoading: _isLoading,
-                        onPressed: _signup,
-                      ),
+                      if (!_signupSuccessful)
+                        CustomButton(
+                          text: 'Sign Up',
+                          isLoading: _isLoading,
+                          onPressed: _signup,
+                        ),
                       const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Already have an account?',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              context.go('/login');
-                            },
-                            child: const Text('Login'),
-                          ),
-                        ],
-                      ),
+                      if (!_signupSuccessful)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Already have an account?',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                context.go('/login');
+                              },
+                              child: const Text('Login'),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),

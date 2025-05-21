@@ -1,56 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_community_app/models/forum_post.dart';
+import 'package:flutter_community_app/models/user.dart';
+import 'package:flutter_community_app/services/auth_service.dart';
+import 'package:flutter_community_app/services/data_service.dart';
 import 'package:flutter_community_app/theme/app_theme.dart';
 import 'package:flutter_community_app/widgets/bottom_nav_bar.dart';
 import 'package:flutter_community_app/widgets/forum_post_card.dart';
 import 'package:flutter_community_app/widgets/user_avatar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final List<ForumPost> _posts = [
-    ForumPost(
-      id: '1',
-      userId: 'user1',
-      userName: 'Priya Sharma',
-      userAvatar: null,
-      department: 'Artificial Intelligence & Data Science',
-      content: 'Has anyone completed the Machine Learning assignment? I\'m stuck on the clustering algorithm part.',
-      likes: 5,
-      comments: 3,
-      timeAgo: '2h ago',
-    ),
-    ForumPost(
-      id: '2',
-      userId: 'user2',
-      userName: 'Rahul Patel',
-      userAvatar: null,
-      department: 'Computer Science',
-      content: 'I\'m organizing a web development workshop this weekend. Anyone interested can DM me for details!',
-      likes: 12,
-      comments: 7,
-      timeAgo: '5h ago',
-    ),
-    ForumPost(
-      id: '3',
-      userId: 'user3',
-      userName: 'Ananya Gupta',
-      userAvatar: null,
-      department: 'Information Technology',
-      content: 'Looking for study partners for the upcoming database exam. We can meet in the library.',
-      likes: 8,
-      comments: 10,
-      timeAgo: '1d ago',
-    ),
-  ];
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  List<ForumPost> _posts = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosts();
+  }
+
+  Future<void> _loadPosts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final dataService = ref.read(dataServiceProvider);
+      final posts = await dataService.fetchPosts();
+
+      setState(() {
+        _posts = posts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading posts: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider).value;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Campus Connect'),
@@ -67,10 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          // Refresh posts
-          await Future.delayed(const Duration(seconds: 1));
-        },
+        onRefresh: _loadPosts,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -84,9 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const UserAvatar(
+                    UserAvatar(
                       radius: 30,
-                      avatarUrl: null,
+                      avatarUrl: currentUser?.avatarUrl,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -94,13 +92,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Namit Solanki',
+                            currentUser?.name ?? 'Loading...',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            'SY - Artificial Intelligence & Data Science',
+                            _buildUserSubtitle(currentUser),
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppTheme.subtitleColor,
                             ),
@@ -112,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () {
                         // Navigate to edit profile
+                        context.push('/profile-setup');
                       },
                     ),
                   ],
@@ -119,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Department forums section
             Text(
               'Your Department Forums',
@@ -139,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Artificial Intelligence & Data Science',
                     Icons.psychology,
                     Colors.purple,
+                    'aids',
                   ),
                   _buildForumCard(
                     context,
@@ -146,6 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Computer Science',
                     Icons.computer,
                     Colors.blue,
+                    'cs',
                   ),
                   _buildForumCard(
                     context,
@@ -153,12 +154,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Information Technology',
                     Icons.devices,
                     Colors.teal,
+                    'it',
+                  ),
+                  _buildForumCard(
+                    context,
+                    'EXTC',
+                    'Electronics & Telecom',
+                    Icons.settings_input_antenna,
+                    Colors.orange,
+                    'extc',
+                  ),
+                  _buildForumCard(
+                    context,
+                    'MECH',
+                    'Mechanical Engineering',
+                    Icons.precision_manufacturing,
+                    Colors.brown,
+                    'mech',
+                  ),
+                  _buildForumCard(
+                    context,
+                    'CIVIL',
+                    'Civil Engineering',
+                    Icons.domain,
+                    Colors.green,
+                    'civil',
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Recent posts section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -178,17 +204,54 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            
+
             // Posts list
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _posts.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return ForumPostCard(post: _posts[index]);
-              },
-            ),
+            if (_isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_posts.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.post_add,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No posts yet',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Be the first to create a post!',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _posts.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  return ForumPostCard(post: _posts[index]);
+                },
+              ),
           ],
         ),
       ),
@@ -204,16 +267,43 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _buildUserSubtitle(User? user) {
+    if (user == null) {
+      return 'Loading...';
+    }
+
+    String subtitle = '';
+
+    if (user.year != null && user.year!.isNotEmpty) {
+      subtitle += user.year!;
+    }
+
+    if (user.department != null && user.department!.isNotEmpty) {
+      if (subtitle.isNotEmpty) {
+        subtitle += ' - ';
+      }
+      subtitle += user.department!;
+    }
+
+    if (subtitle.isEmpty) {
+      subtitle = 'Complete your profile';
+    }
+
+    return subtitle;
+  }
+
   Widget _buildForumCard(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-  ) {
+      BuildContext context,
+      String title,
+      String subtitle,
+      IconData icon,
+      Color color,
+      String departmentId,
+      ) {
     return GestureDetector(
       onTap: () {
         // Navigate to forum
+        context.push('/forums/$departmentId');
       },
       child: Container(
         width: 150,
@@ -256,7 +346,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showCreatePostDialog(BuildContext context) {
     final textController = TextEditingController();
-    
+    final currentUser = ref.read(currentUserProvider).value;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -277,9 +368,9 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  const UserAvatar(
+                  UserAvatar(
                     radius: 20,
-                    avatarUrl: null,
+                    avatarUrl: currentUser?.avatarUrl,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -326,7 +417,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ElevatedButton(
                     onPressed: () {
                       // Submit post
-                      Navigator.pop(context);
+                      if (textController.text.trim().isNotEmpty) {
+                        // TODO: Implement post creation
+                        // For now, just close the dialog
+                        Navigator.pop(context);
+                      }
                     },
                     child: const Text('Post'),
                   ),

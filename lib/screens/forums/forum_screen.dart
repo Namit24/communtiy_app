@@ -1,29 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_community_app/models/forum_post.dart';
+import 'package:flutter_community_app/providers/auth_provider.dart';
+import 'package:flutter_community_app/providers/data_provider.dart';
+import 'package:flutter_community_app/providers/posts_provider.dart';
 import 'package:flutter_community_app/theme/app_theme.dart';
 import 'package:flutter_community_app/widgets/forum_post_card.dart';
 import 'package:flutter_community_app/widgets/user_avatar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ForumScreen extends StatefulWidget {
+class ForumScreen extends ConsumerStatefulWidget {
   final String departmentId;
-  
+
   const ForumScreen({
     super.key,
     required this.departmentId,
   });
 
   @override
-  State<ForumScreen> createState() => _ForumScreenState();
+  ConsumerState<ForumScreen> createState() => _ForumScreenState();
 }
 
-class _ForumScreenState extends State<ForumScreen> {
+class _ForumScreenState extends ConsumerState<ForumScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'Recent';
-  
+
   // Mock data - in a real app, this would be fetched based on departmentId
   late String _departmentName;
-  
+
   final List<ForumPost> _posts = [
     ForumPost(
       id: '1',
@@ -79,7 +83,7 @@ class _ForumScreenState extends State<ForumScreen> {
         _searchQuery = _searchController.text;
       });
     });
-    
+
     // Initialize department name - in a real app, this would be fetched from a database
     _initDepartmentName();
   }
@@ -108,7 +112,7 @@ class _ForumScreenState extends State<ForumScreen> {
 
   List<ForumPost> get _filteredPosts {
     List<ForumPost> filtered = _posts;
-    
+
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((post) {
@@ -116,11 +120,11 @@ class _ForumScreenState extends State<ForumScreen> {
             post.userName.toLowerCase().contains(_searchQuery.toLowerCase());
       }).toList();
     }
-    
+
     // Sort based on selected filter
     switch (_selectedFilter) {
       case 'Recent':
-        // Already sorted by recent
+      // Already sorted by recent
         break;
       case 'Popular':
         filtered.sort((a, b) => b.likes.compareTo(a.likes));
@@ -129,7 +133,7 @@ class _ForumScreenState extends State<ForumScreen> {
         filtered.sort((a, b) => b.comments.compareTo(a.comments));
         break;
     }
-    
+
     return filtered;
   }
 
@@ -155,11 +159,11 @@ class _ForumScreenState extends State<ForumScreen> {
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                            },
-                          )
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                    )
                         : null,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -214,22 +218,23 @@ class _ForumScreenState extends State<ForumScreen> {
           Expanded(
             child: _filteredPosts.isEmpty
                 ? const Center(
-                    child: Text('No posts found'),
-                  )
+              child: Text('No posts found'),
+            )
                 : RefreshIndicator(
-                    onRefresh: () async {
-                      // Refresh posts
-                      await Future.delayed(const Duration(seconds: 1));
-                    },
-                    child: ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredPosts.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return ForumPostCard(post: _filteredPosts[index]);
-                      },
-                    ),
-                  ),
+              onRefresh: () async {
+                // Refresh posts
+                ref.refresh(postsProvider);
+                await Future.delayed(const Duration(seconds: 1));
+              },
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _filteredPosts.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  return ForumPostCard(post: _filteredPosts[index]);
+                },
+              ),
+            ),
           ),
         ],
       ),
@@ -246,7 +251,11 @@ class _ForumScreenState extends State<ForumScreen> {
 
   void _showCreatePostDialog(BuildContext context) {
     final textController = TextEditingController();
-    
+    final dataService = ref.read(dataServiceProvider);
+    final authService = ref.read(authServiceProvider);
+    final user = authService.currentUser;
+    bool isSubmitting = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -254,77 +263,125 @@ class _ForumScreenState extends State<ForumScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const UserAvatar(
-                    radius: 20,
-                    avatarUrl: null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Create Post',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: textController,
-                decoration: const InputDecoration(
-                  hintText: 'What\'s on your mind?',
-                  border: InputBorder.none,
+        return StatefulBuilder(
+            builder: (context, setState) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                  left: 16,
+                  right: 16,
+                  top: 16,
                 ),
-                maxLines: 5,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.image_outlined),
-                    onPressed: () {
-                      // Add image
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.attach_file),
-                    onPressed: () {
-                      // Add attachment
-                    },
-                  ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: () {
-                      // Submit post
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Post'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const UserAvatar(
+                          radius: 20,
+                          avatarUrl: null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Create Post',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: textController,
+                      decoration: const InputDecoration(
+                        hintText: 'What\'s on your mind?',
+                        border: InputBorder.none,
+                      ),
+                      maxLines: 5,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.image_outlined),
+                          onPressed: () {
+                            // Add image
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.attach_file),
+                          onPressed: () {
+                            // Add attachment
+                          },
+                        ),
+                        const Spacer(),
+                        ElevatedButton(
+                          onPressed: isSubmitting ? null : () async {
+                            if (textController.text.trim().isEmpty) {
+                              return;
+                            }
+
+                            setState(() {
+                              isSubmitting = true;
+                            });
+
+                            if (user != null) {
+                              final success = await dataService.createPost(
+                                textController.text.trim(),
+                                user.id,
+                                user.name,
+                                user.department,
+                              );
+
+                              if (success && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Post created successfully!')),
+                                );
+                                Navigator.pop(context);
+
+                                // Refresh posts
+                                ref.refresh(postsProvider);
+                              } else if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to create post. Please try again.')),
+                                );
+                                setState(() {
+                                  isSubmitting = false;
+                                });
+                              }
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('You must be logged in to post')),
+                              );
+                              setState(() {
+                                isSubmitting = false;
+                              });
+                            }
+                          },
+                          child: isSubmitting
+                              ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2)
+                          )
+                              : const Text('Post'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              );
+            }
         );
       },
     );
