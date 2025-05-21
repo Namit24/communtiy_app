@@ -5,6 +5,9 @@ import 'package:flutter_community_app/theme/app_theme.dart';
 import 'package:flutter_community_app/widgets/custom_button.dart';
 import 'package:flutter_community_app/widgets/profile_avatar.dart';
 import 'package:flutter_community_app/services/auth_service.dart';
+import 'package:flutter_community_app/utils/error_handler.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -20,6 +23,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   String? _selectedYear;
   bool _isLoading = false;
   String? _avatarUrl;
+  String? _localAvatarPath;
   String? _errorMessage;
 
   final List<String> _branches = [
@@ -40,9 +44,43 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = ref.read(authServiceProvider).currentUser;
+    if (user != null) {
+      setState(() {
+        _nameController.text = user.name;
+        _avatarUrl = user.avatarUrl;
+        _selectedBranch = user.department;
+        _selectedYear = user.year;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 75,
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _localAvatarPath = pickedFile.path;
+      });
+    }
   }
 
   Future<void> _completeProfile() async {
@@ -54,20 +92,33 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
       try {
         final authService = ref.read(authServiceProvider);
-        final user = await authService.updateProfile(
+
+        // Upload avatar if selected
+        String? newAvatarUrl = _avatarUrl;
+        if (_localAvatarPath != null) {
+          final fileName = _localAvatarPath!.split('/').last;
+          newAvatarUrl = await authService.uploadAvatar(_localAvatarPath!, fileName);
+        }
+
+        final result = await authService.updateProfile(
           name: _nameController.text.trim(),
-          avatarUrl: _avatarUrl,
+          avatarUrl: newAvatarUrl,
           department: _selectedBranch,
           year: _selectedYear,
         );
 
-        if (user != null && mounted) {
+        if (result.success && mounted) {
           context.go('/home');
+        } else {
+          setState(() {
+            _errorMessage = result.errorMessage ?? 'Profile update failed';
+          });
         }
       } catch (e) {
         setState(() {
           _errorMessage = 'Profile setup failed: ${e.toString()}';
         });
+        ErrorHandler.logError('ProfileSetupScreen._completeProfile', e, null);
       } finally {
         if (mounted) {
           setState(() {
@@ -89,12 +140,6 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     }
   }
 
-  void _onAvatarChanged(String url) {
-    setState(() {
-      _avatarUrl = url;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,10 +158,44 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 16),
-                ProfileAvatar(
-                  radius: 60,
-                  avatarUrl: _avatarUrl,
-                  onChanged: _onAvatarChanged,
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: _getAvatarImage(),
+                        child: _getAvatarImage() == null
+                            ? Icon(
+                          Icons.person,
+                          size: 60,
+                          color: Colors.grey.shade400,
+                        )
+                            : null,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -220,5 +299,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         ),
       ),
     );
+  }
+
+  ImageProvider? _getAvatarImage() {
+    if (_localAvatarPath != null) {
+      return FileImage(File(_localAvatarPath!));
+    } else if (_avatarUrl != null) {
+      return NetworkImage(_avatarUrl!);
+    }
+    return null;
   }
 }

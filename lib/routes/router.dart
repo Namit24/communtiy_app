@@ -21,16 +21,23 @@ final routerProvider = Provider<GoRouter>((ref) {
   // Watch the authentication state and app initialization state
   final appState = ref.watch(appStateProvider);
   final isAuthenticated = ref.watch(authStateProvider);
-  
+
   // Create redirect function with current state values
   final redirectFunction = createRedirectFunction(
     isInitialized: appState.isInitialized,
     isAuthenticated: isAuthenticated,
   );
-  
+
+  // Force router to refresh when auth state changes
+  ref.listen<bool>(authStateProvider, (previous, current) {
+    print('Auth state changed: $previous -> $current');
+  });
+
   return GoRouter(
     initialLocation: '/',
+    debugLogDiagnostics: true, // Enable debug logging
     redirect: redirectFunction,
+    refreshListenable: RouterRefreshNotifier(ref),
     routes: [
       GoRoute(
         path: '/',
@@ -92,8 +99,48 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
-        child: Text('Page not found: ${state.matchedLocation}'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Page not found: ${state.matchedLocation}',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => context.go('/home'),
+              child: const Text('Go Home'),
+            ),
+          ],
+        ),
       ),
     ),
   );
 });
+
+// Update the RouterRefreshNotifier class to make it more responsive
+class RouterRefreshNotifier extends ChangeNotifier {
+  final Ref _ref;
+  bool _isAuthenticated = false;
+  bool _isInitialized = false;
+
+  RouterRefreshNotifier(this._ref) {
+    _init();
+  }
+
+  void _init() {
+    // Listen to auth state changes
+    _ref.listen<bool>(authStateProvider, (_, isAuthenticated) {
+      print('RouterRefreshNotifier: Auth state changed to $isAuthenticated');
+      _isAuthenticated = isAuthenticated;
+      notifyListeners();
+    });
+
+    // Also listen to app initialization state
+    _ref.listen<AppState>(appStateProvider, (_, appState) {
+      if (_isInitialized != appState.isInitialized) {
+        _isInitialized = appState.isInitialized;
+        print('RouterRefreshNotifier: App init state changed to $_isInitialized');
+        notifyListeners();
+      }
+    });
+  }
+}

@@ -1,186 +1,302 @@
 import 'dart:async';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_community_app/models/user.dart';
-import 'package:flutter_community_app/services/api_service.dart';
+import 'package:flutter_community_app/services/supabase_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
-// Authentication service to handle login, signup, and profile management
+class AuthResult {
+  final bool success;
+  final User? user;
+  final String? errorMessage;
+
+  AuthResult({
+    required this.success,
+    this.user,
+    this.errorMessage,
+  });
+}
+
 class AuthService {
-  final ApiService _apiService;
+  final SupabaseService _supabaseService;
   User? _currentUser;
+  final StreamController<User?> _authStateController = StreamController<User?>.broadcast();
+  bool _isAuthenticated = false;
 
-  // Stream controller to broadcast authentication state changes
-  final _authStateController = StreamController<User?>.broadcast();
-  Stream<User?> get authStateChanges => _authStateController.stream;
+  AuthService(this._supabaseService) {
+    // Initialize the auth state
+    initialize();
+  }
 
-  // Get current user
-  User? get currentUser => _currentUser;
-
-  AuthService(this._apiService);
-
-  // Initialize auth service and check for stored user credentials
+  // Initialize auth state and listen for changes
   Future<void> initialize() async {
     try {
-      await _apiService.initialize();
+      // Check if user is already authenticated
+      if (_supabaseService.isAuthenticated) {
+        _currentUser = await _supabaseService.getUserProfile();
+        _isAuthenticated = _currentUser != null;
+        _authStateController.add(_currentUser);
+        print('Auth initialized: isAuthenticated=$_isAuthenticated, user=${_currentUser?.name}');
 
-      // If we have a token, try to get the current user
-      if (_apiService.token != null) {
-        // In a real app, you would have an endpoint to get the current user
-        // For now, we'll just set the user as authenticated
-        _authStateController.add(User(
-          id: 'temp-id',
-          email: 'temp@example.com',
-          name: 'Temporary User',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
+        // Force update the auth state provider
+        if (_isAuthenticated) {
+          final container = riverpod.ProviderContainer();
+          container.read(authStateProvider.notifier).state = true;
+        }
       } else {
+        _isAuthenticated = false;
         _authStateController.add(null);
+        print('Auth initialized: not authenticated');
       }
+
+      // Listen for auth state changes
+      Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+        final AuthChangeEvent event = data.event;
+        print('**** onAuthStateChange: $event');
+
+        if (event == AuthChangeEvent.signedIn) {
+          // Add a delay to allow the database trigger to create the profile
+          await Future.delayed(const Duration(milliseconds: 500));
+          try {
+            _currentUser = await _supabaseService.getUserProfile();
+            _isAuthenticated = _currentUser != null;
+            print('Auth state updated: isAuthenticated=$_isAuthenticated, user=${_currentUser?.name}');
+            _authStateController.add(_currentUser);
+
+            // Force update the auth state provider
+            if (_isAuthenticated) {
+              final container = riverpod.ProviderContainer();
+              container.read(authStateProvider.notifier).state = true;
+            }
+          } catch (e) {
+            print('Error updating auth state after sign in: $e');
+            _isAuthenticated = false;
+            _authStateController.add(null);
+          }
+        } else if (event == AuthChangeEvent.signedOut) {
+          _currentUser = null;
+          _isAuthenticated = false;
+          _authStateController.add(null);
+          print('Auth state updated: signed out');
+
+          // Force update the auth state provider
+          final container = riverpod.ProviderContainer();
+          container.read(authStateProvider.notifier).state = false;
+        }
+      });
     } catch (e) {
       print('Error initializing auth service: $e');
+      _isAuthenticated = false;
       _authStateController.add(null);
     }
   }
 
+  // Get current user
+  User? get currentUser => _currentUser;
+
+  // Get auth state stream
+  Stream<User?> get authStateChanges => _authStateController.stream;
+
+  // Check if user is authenticated
+  bool get isAuthenticated => _isAuthenticated;
+
   // Sign in with email and password
-  Future<User?> signIn(String email, String password) async {
+  Future<AuthResult> signInWithEmail(String email, String password) async {
     try {
-      // For development, use mock data instead of actual API call
-      // Comment out the API call and use mock data instead
-      /*
-      final response = await _apiService.login(email, password);
-      final userData = response['user'];
-      */
+      final response = await _supabaseService.signInWithEmail(
+        email: email,
+        password: password,
+      );
 
-      // Mock user data for development
-      final userData = {
-        'id': 'mock-user-id',
-        'email': email,
-        'name': email.split('@')[0],
-        'createdAt': DateTime.now().toIso8601String(),
-        'updatedAt': DateTime.now().toIso8601String(),
-      };
+      if (response.user != null) {
+        // Add a delay to ensure profile is available
+        await Future.delayed(const Duration(milliseconds: 500));
+        try {
+          _currentUser = await _supabaseService.getUserProfile();
+          _isAuthenticated = _currentUser != null;
+          print('Sign in successful: isAuthenticated=$_isAuthenticated, user=${_currentUser?.name}');
+          _authStateController.add(_currentUser);
 
-      _currentUser = User.fromJson(userData);
-      _authStateController.add(_currentUser);
-
-      return _currentUser;
+          return AuthResult(
+            success: true,
+            user: _currentUser,
+          );
+        } catch (e) {
+          print('Error getting profile after sign in: $e');
+          _isAuthenticated = false;
+          _authStateController.add(null);
+          return AuthResult(
+            success: false,
+            errorMessage: 'Error getting user profile: $e',
+          );
+        }
+      } else {
+        _isAuthenticated = false;
+        return AuthResult(
+          success: false,
+          errorMessage: 'Invalid email or password',
+        );
+      }
     } catch (e) {
       print('Sign in error: $e');
-      rethrow;
+      _isAuthenticated = false;
+      return AuthResult(
+        success: false,
+        errorMessage: e.toString(),
+      );
     }
   }
 
   // Register with email and password
-  Future<User?> signUp(String email, String password, {String? name}) async {
+  Future<AuthResult> signUpWithEmail(String email, String password, {String? name}) async {
     try {
-      // For development, use mock data instead of actual API call
-      // Comment out the API call and use mock data instead
-      /*
-      final response = await _apiService.register(email, password, name);
-      final userData = response['user'];
-      */
+      final response = await _supabaseService.signUp(
+        email: email,
+        password: password,
+        data: {
+          'name': name ?? email.split('@')[0],
+        },
+      );
 
-      // Mock user data for development
-      final userData = {
-        'id': 'mock-user-id',
-        'email': email,
-        'name': name ?? email.split('@')[0],
-        'createdAt': DateTime.now().toIso8601String(),
-        'updatedAt': DateTime.now().toIso8601String(),
-      };
+      if (response.user != null) {
+        // The profile will be created by the database trigger
+        // Add a delay to ensure the trigger has time to execute
+        await Future.delayed(const Duration(milliseconds: 1000));
 
-      _currentUser = User.fromJson(userData);
-      _authStateController.add(_currentUser);
+        try {
+          _currentUser = await _supabaseService.getUserProfile();
+          if (_currentUser == null) {
+            // If profile still doesn't exist, create a basic user object
+            final now = DateTime.now();
+            _currentUser = User(
+              id: response.user!.id,
+              name: name ?? email.split('@')[0],
+              email: email,
+              avatarUrl: null,
+              createdAt: now,
+              updatedAt: now,
+            );
+          }
+          _isAuthenticated = true;
+          print('Sign up successful: isAuthenticated=$_isAuthenticated, user=${_currentUser?.name}');
+          _authStateController.add(_currentUser);
+        } catch (profileError) {
+          print('Error getting profile after signup: $profileError');
+          // Create a basic user object from auth data
+          final now = DateTime.now();
+          _currentUser = User(
+            id: response.user!.id,
+            name: name ?? email.split('@')[0],
+            email: email,
+            avatarUrl: null,
+            createdAt: now,
+            updatedAt: now,
+          );
+          _isAuthenticated = true;
+          _authStateController.add(_currentUser);
+        }
 
-      return _currentUser;
+        return AuthResult(
+          success: true,
+          user: _currentUser,
+        );
+      } else {
+        _isAuthenticated = false;
+        return AuthResult(
+          success: false,
+          errorMessage: 'Failed to create account',
+        );
+      }
     } catch (e) {
       print('Sign up error: $e');
-      rethrow;
+      _isAuthenticated = false;
+      return AuthResult(
+        success: false,
+        errorMessage: e.toString(),
+      );
     }
   }
 
   // Update user profile
-  Future<User?> updateProfile({
+  Future<AuthResult> updateProfile({
     required String name,
     String? avatarUrl,
     String? department,
     String? year,
   }) async {
     try {
-      // For development, use mock data instead of actual API call
-      // Comment out the API call and use mock data instead
-      /*
-      final response = await _apiService.updateProfile(
+      final updatedUser = await _supabaseService.updateUserProfile(
         name: name,
         avatarUrl: avatarUrl,
         department: department,
         year: year,
       );
 
-      final userData = response['user'];
-      */
+      if (updatedUser != null) {
+        _currentUser = updatedUser;
+        _isAuthenticated = true;
+        _authStateController.add(_currentUser);
 
-      // Mock updated user data for development
-      if (_currentUser == null) {
-        throw Exception('User not authenticated');
+        return AuthResult(
+          success: true,
+          user: _currentUser,
+        );
+      } else {
+        return AuthResult(
+          success: false,
+          errorMessage: 'Failed to update profile',
+        );
       }
-
-      _currentUser = _currentUser!.copyWith(
-        name: name,
-        avatarUrl: avatarUrl,
-        department: department,
-        year: year,
-      );
-
-      _authStateController.add(_currentUser);
-
-      return _currentUser;
     } catch (e) {
       print('Update profile error: $e');
-      rethrow;
+      return AuthResult(
+        success: false,
+        errorMessage: e.toString(),
+      );
     }
   }
 
-  // Sign out current user
-  Future<void> signOut() async {
+  // Upload avatar image
+  Future<String?> uploadAvatar(String filePath, String fileName) async {
     try {
-      await _apiService.clearToken();
-      _currentUser = null;
-      _authStateController.add(null);
+      return await _supabaseService.uploadAvatar(filePath, fileName);
     } catch (e) {
-      print('Sign out error: $e');
-      rethrow;
+      print('Upload avatar error: $e');
+      return null;
     }
   }
 
-  // Dispose method to clean up resources
+  // Sign out
+  Future<void> signOut() async {
+    await _supabaseService.signOut();
+    _currentUser = null;
+    _isAuthenticated = false;
+    _authStateController.add(null);
+    print('User signed out');
+  }
+
+  // Dispose
   void dispose() {
     _authStateController.close();
   }
 }
 
-// Provider for AuthService
-final authServiceProvider = Provider<AuthService>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
-  final authService = AuthService(apiService);
-  ref.onDispose(() => authService.dispose());
-  return authService;
+// Provider for auth service
+final authServiceProvider = riverpod.Provider<AuthService>((ref) {
+  final supabaseService = ref.watch(supabaseServiceProvider);
+  return AuthService(supabaseService);
+});
+
+// Provider for auth state
+final authStateProvider = riverpod.StateProvider<bool>((ref) {
+  final authService = ref.watch(authServiceProvider);
+  final isAuth = authService.isAuthenticated;
+  print('authStateProvider: isAuthenticated=$isAuth');
+  return isAuth;
 });
 
 // Provider for current user
-final currentUserProvider = StreamProvider<User?>((ref) {
+final currentUserProvider = riverpod.StreamProvider<User?>((ref) {
   final authService = ref.watch(authServiceProvider);
-  // Initialize auth service
-  authService.initialize();
   return authService.authStateChanges;
-});
-
-// Provider for authentication state
-final authStateProvider = Provider<bool>((ref) {
-  final userAsyncValue = ref.watch(currentUserProvider);
-  return userAsyncValue.maybeWhen(
-    data: (user) => user != null,
-    orElse: () => false,
-  );
 });

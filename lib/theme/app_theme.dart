@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Colors
@@ -11,7 +10,7 @@ class AppTheme {
   static const Color textColor = Color(0xFF2D3748);
   static const Color subtitleColor = Color(0xFF718096);
   static const Color errorColor = Color(0xFFE53E3E);
-  
+
   // Dark theme colors
   static const Color darkBackgroundColor = Color(0xFF1A202C);
   static const Color darkCardColor = Color(0xFF2D3748);
@@ -20,22 +19,13 @@ class AppTheme {
 
   static ThemeData get lightTheme {
     final baseTheme = ThemeData.light();
-    
-    // Use a try-catch block to handle potential font loading issues
-    TextTheme textTheme;
-    try {
-      textTheme = GoogleFonts.poppinsTextTheme(baseTheme.textTheme).apply(
-        bodyColor: textColor,
-        displayColor: textColor,
-      );
-    } catch (e) {
-      // Fallback to system fonts if Google Fonts fails
-      textTheme = baseTheme.textTheme.apply(
-        bodyColor: textColor,
-        displayColor: textColor,
-      );
-    }
-    
+
+    // Use system fonts instead of Google Fonts
+    final textTheme = baseTheme.textTheme.apply(
+      bodyColor: textColor,
+      displayColor: textColor,
+    );
+
     return ThemeData(
       primaryColor: primaryColor,
       scaffoldBackgroundColor: backgroundColor,
@@ -82,22 +72,13 @@ class AppTheme {
 
   static ThemeData get darkTheme {
     final baseTheme = ThemeData.dark();
-    
-    // Use a try-catch block to handle potential font loading issues
-    TextTheme textTheme;
-    try {
-      textTheme = GoogleFonts.poppinsTextTheme(baseTheme.textTheme).apply(
-        bodyColor: darkTextColor,
-        displayColor: darkTextColor,
-      );
-    } catch (e) {
-      // Fallback to system fonts if Google Fonts fails
-      textTheme = baseTheme.textTheme.apply(
-        bodyColor: darkTextColor,
-        displayColor: darkTextColor,
-      );
-    }
-    
+
+    // Use system fonts instead of Google Fonts
+    final textTheme = baseTheme.textTheme.apply(
+      bodyColor: darkTextColor,
+      displayColor: darkTextColor,
+    );
+
     return ThemeData(
       primaryColor: primaryColor,
       scaffoldBackgroundColor: darkBackgroundColor,

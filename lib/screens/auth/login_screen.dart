@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_community_app/theme/app_theme.dart';
 import 'package:flutter_community_app/widgets/custom_button.dart';
 import 'package:flutter_community_app/services/auth_service.dart';
+import 'package:flutter_community_app/utils/error_handler.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -36,18 +37,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       try {
         final authService = ref.read(authServiceProvider);
-        final user = await authService.signIn(
+        final result = await authService.signInWithEmail(
           _emailController.text.trim(),
           _passwordController.text,
         );
 
-        if (user != null && mounted) {
-          // Login successful, navigation will be handled by router redirect
+        if (result.success && mounted) {
+          // Check if profile is complete
+          final user = result.user;
+
+          // Force update the auth state
+          ref.read(authStateProvider.notifier).state = true;
+
+          // Force navigation with a slight delay to allow state to propagate
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              if (user != null && (user.department == null || user.year == null)) {
+                context.go('/profile-setup');
+              } else {
+                context.go('/home');
+              }
+            }
+          });
+        } else {
+          setState(() {
+            _errorMessage = result.errorMessage ?? 'Login failed';
+          });
         }
       } catch (e) {
         setState(() {
           _errorMessage = 'Login failed: ${e.toString()}';
         });
+        ErrorHandler.logError('LoginScreen._login', e, null);
       } finally {
         if (mounted) {
           setState(() {
@@ -61,6 +82,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -154,23 +182,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your password';
                           }
-                          if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
-                          }
                           return null;
                         },
                       ),
-                      const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: () {
-                            // Forgot password functionality
+                            // TODO: Implement forgot password
                           },
                           child: const Text('Forgot Password?'),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       CustomButton(
                         text: 'Login',
                         isLoading: _isLoading,

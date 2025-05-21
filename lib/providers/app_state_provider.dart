@@ -1,16 +1,20 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_community_app/services/auth_service.dart';
 
-// Manage application state
+// Provider for dark mode state
+final darkModeProvider = StateProvider<bool>((ref) => false);
+
+// App state class
 class AppState {
   final bool isInitialized;
   final bool isDarkMode;
-  
+
   AppState({
-    this.isInitialized = false,
-    this.isDarkMode = false,
+    required this.isInitialized,
+    required this.isDarkMode,
   });
-  
+
   AppState copyWith({
     bool? isInitialized,
     bool? isDarkMode,
@@ -25,24 +29,26 @@ class AppState {
 // App state notifier
 class AppStateNotifier extends StateNotifier<AppState> {
   final AuthService _authService;
-  
-  AppStateNotifier(this._authService) : super(AppState()) {
-    _initialize();
+
+  AppStateNotifier(this._authService) : super(AppState(isInitialized: false, isDarkMode: false)) {
+    _initializeApp();
   }
-  
-  // Initialize app state and services
-  Future<void> _initialize() async {
-    // Simulate app initialization delay
-    await Future.delayed(const Duration(seconds: 2));
-    
-    // Initialize auth service
-    await _authService.initialize();
-    
-    // Mark app as initialized
-    state = state.copyWith(isInitialized: true);
+
+  Future<void> _initializeApp() async {
+    try {
+      // Initialize auth service
+      await _authService.initialize();
+
+      // Update state to indicate initialization is complete
+      state = state.copyWith(isInitialized: true);
+      print('App initialization complete');
+    } catch (e) {
+      print('Error initializing app: $e');
+      // Still mark as initialized to avoid getting stuck
+      state = state.copyWith(isInitialized: true);
+    }
   }
-  
-  // Toggle dark mode
+
   void toggleDarkMode() {
     state = state.copyWith(isDarkMode: !state.isDarkMode);
   }
@@ -52,9 +58,4 @@ class AppStateNotifier extends StateNotifier<AppState> {
 final appStateProvider = StateNotifierProvider<AppStateNotifier, AppState>((ref) {
   final authService = ref.watch(authServiceProvider);
   return AppStateNotifier(authService);
-});
-
-// Provider for dark mode status
-final darkModeProvider = Provider<bool>((ref) {
-  return ref.watch(appStateProvider).isDarkMode;
 });
